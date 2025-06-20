@@ -36,7 +36,6 @@ export default function PaymentPage() {
       }
 
       try {
-        // Fetch user from Supabase Auth
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
           setError('You must be logged in to view rental details.');
@@ -44,37 +43,6 @@ export default function PaymentPage() {
           return;
         }
 
-        // Ensure user exists in the users table
-        const { data: existingUser, error: userCheckError } = await supabase
-          .from('users')
-          .select('id, full_name, email')
-          .eq('id', user.id)
-          .single();
-          
-        let userName = user.user_metadata?.full_name || '';
-        let userEmail = user.email || '';
-        
-        if (userCheckError) {
-          // User doesn't exist in users table, need to create entry
-          const { error: createUserError } = await supabase
-            .from('users')
-            .insert({
-              id: user.id,
-              email: userEmail,
-              full_name: userName,
-              created_at: new Date().toISOString()
-            });
-            
-          if (createUserError) {
-            console.error('Failed to create user record:', createUserError);
-          }
-        } else if (existingUser) {
-          // Use data from users table if available
-          userName = existingUser.full_name || userName;
-          userEmail = existingUser.email || userEmail;
-        }
-
-        // First, get the rental information
         const { data: rentalData, error: rentalError } = await supabase
           .from('rentals')
           .select('id, box_id, price, status, payment_status, items_type')
@@ -82,13 +50,11 @@ export default function PaymentPage() {
           .single();
 
         if (rentalError || !rentalData) {
-          console.error('Rental fetch error:', rentalError);
           setError('Failed to load rental details');
           setLoading(false);
           return;
         }
 
-        // Then, get the box information separately
         const { data: boxData, error: boxError } = await supabase
           .from('boxes')
           .select('id, box_code, status')
@@ -96,13 +62,11 @@ export default function PaymentPage() {
           .single();
 
         if (boxError || !boxData) {
-          console.error('Box fetch error:', boxError);
           setError('Failed to load box details');
           setLoading(false);
           return;
         }
 
-        // Determine rent duration based on price
         let rentDuration = 'one_day';
         if (rentalData.price >= 99) rentDuration = 'one_month';
         else if (rentalData.price >= 29) rentDuration = 'one_week';
@@ -116,12 +80,11 @@ export default function PaymentPage() {
           price: rentalData.price,
           rent_duration: rentDuration,
           items_type: rentalData.items_type,
-          user_name: userName,
-          user_email: userEmail
+          user_name: user.user_metadata?.full_name || '',
+          user_email: user.email || '',
         });
-      } catch (err) {
-        console.error('Error fetching rental:', err);
-        setError('An unexpected error occurred');
+      } catch {
+        setError('Unexpected error occurred');
       } finally {
         setLoading(false);
       }
@@ -130,35 +93,15 @@ export default function PaymentPage() {
     fetchRentalDetails();
   }, [rentalId]);
 
-  const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPaymentMethod(e.target.value);
-  };
-
-  const generatePinCode = (): string => {
-    return Math.floor(1000 + Math.random() * 9000).toString();
-  };
-
   const calculateDates = (duration: string) => {
     const startDate = new Date();
     const endDate = new Date(startDate);
-
     switch (duration) {
-      case 'one_day':
-        endDate.setDate(startDate.getDate() + 1);
-        break;
-      case 'three_days':
-        endDate.setDate(startDate.getDate() + 3);
-        break;
-      case 'one_week':
-        endDate.setDate(startDate.getDate() + 7);
-        break;
-      case 'one_month':
-        endDate.setMonth(startDate.getMonth() + 1);
-        break;
-      default:
-        endDate.setDate(startDate.getDate() + 1);
+      case 'one_day': endDate.setDate(startDate.getDate() + 1); break;
+      case 'three_days': endDate.setDate(startDate.getDate() + 3); break;
+      case 'one_week': endDate.setDate(startDate.getDate() + 7); break;
+      case 'one_month': endDate.setMonth(startDate.getMonth() + 1); break;
     }
-
     return {
       startDate: startDate.toISOString().split('T')[0],
       endDate: endDate.toISOString().split('T')[0],
@@ -167,140 +110,72 @@ export default function PaymentPage() {
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!rental) return;
-
-    setProcessing(true);
     setError(null);
+    setProcessing(true);
 
     try {
-      const pinCode = generatePinCode();
       const { startDate, endDate } = calculateDates(rental.rent_duration);
 
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          rental_id: rental.id,
-          amount: rental.price,
-          payment_date: new Date().toISOString(),
-          method: paymentMethod,
-          status: 'paid',
-        });
+      const { error: paymentError } = await supabase.from('payments').insert({
+        rental_id: rental.id,
+        amount: rental.price,
+        payment_date: new Date().toISOString(),
+        method: paymentMethod,
+        status: 'paid',
+      });
 
-      if (paymentError) throw new Error(`Payment record creation failed: ${paymentError.message}`);
+      if (paymentError) throw new Error(paymentError.message);
 
-      const { error: rentalUpdateError } = await supabase
-        .from('rentals')
-        .update({
-          start_date: startDate,
-          end_date: endDate,
-          pin_code: pinCode,
-          status: 'active',
-          payment_status: 'paid',
-        })
-        .eq('id', rental.id);
+      const { error: rentalUpdateError } = await supabase.from('rentals').update({
+        start_date: startDate,
+        end_date: endDate,
+        status: 'active',
+        payment_status: 'paid',
+      }).eq('id', rental.id);
 
-      if (rentalUpdateError) throw new Error(`Rental update failed: ${rentalUpdateError.message}`);
+      if (rentalUpdateError) throw new Error(rentalUpdateError.message);
 
-      const { error: boxUpdateError } = await supabase
-        .from('boxes')
-        .update({
-          status: 'unavailable',
-        })
-        .eq('id', rental.box_id);
+      await supabase.from('boxes').update({ status: 'unavailable' }).eq('id', rental.box_id);
 
-      if (boxUpdateError) throw new Error(`Box update failed: ${boxUpdateError.message}`);
-
-      router.push(`/confirmation?rentalId=${rental.id}`);
-    } catch (err) {
-      console.error('Payment processing error:', err);
-      setError(err instanceof Error ? err.message : 'Payment processing failed');
+      router.push(`/set-pin?rentalId=${rental.id}`);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
       setProcessing(false);
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading payment details...</div>;
-  }
-
-  if (error) {
-    return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
-  }
-
-  if (!rental) {
-    return <div className="min-h-screen flex items-center justify-center">Rental information not found</div>;
-  }
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p className="text-red-500">{error}</p>;
+  if (!rental) return <p>No rental found.</p>;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="px-6 py-4 bg-blue-600">
-          <h2 className="text-xl font-bold text-white">Complete Your Payment</h2>
+    <div className="p-6">
+      <h2 className="text-lg font-semibold mb-4">Pay for Box {rental.box_code}</h2>
+      <p>Total: ${rental.price.toFixed(2)}</p>
+      <form onSubmit={handlePayment} className="mt-4 space-y-4">
+        <div>
+          <label htmlFor="method" className="block mb-2">Payment Method</label>
+          <select
+            id="method"
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            className="border p-2 rounded w-full"
+          >
+            <option value="credit_card">Credit Card</option>
+            <option value="bank_transfer">Bank Transfer</option>
+            <option value="digital_wallet">Digital Wallet</option>
+          </select>
         </div>
-
-        <div className="p-6">
-          <div className="mb-6 space-y-3">
-            <div className="flex justify-between border-b pb-3">
-              <span className="text-gray-600">Box Code:</span>
-              <span className="font-medium">{rental.box_code}</span>
-            </div>
-            <div className="flex justify-between border-b pb-3">
-              <span className="text-gray-600">Items Type:</span>
-              <span className="font-medium">{rental.items_type}</span>
-            </div>
-            <div className="flex justify-between border-b pb-3">
-              <span className="text-gray-600">Renter:</span>
-              <span className="font-medium">{rental.user_name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total Amount:</span>
-              <span className="text-xl font-bold text-blue-600">${rental.price.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <form onSubmit={handlePayment} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Payment Method
-              </label>
-              <div className="space-y-3">
-                {['credit_card', 'bank_transfer', 'digital_wallet'].map((method) => (
-                  <div className="flex items-center" key={method}>
-                    <input
-                      type="radio"
-                      id={method}
-                      name="paymentMethod"
-                      value={method}
-                      checked={paymentMethod === method}
-                      onChange={handlePaymentMethodChange}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    />
-                    <label htmlFor={method} className="ml-3 block text-sm font-medium text-gray-700 capitalize">
-                      {method.replace('_', ' ')}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-md text-sm text-gray-600">
-              <p>
-                This is a demo environment. By clicking "Complete Payment", the transaction will be simulated as successful.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={processing}
-              className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                processing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              {processing ? 'Processing...' : 'Complete Payment'}
-            </button>
-          </form>
-        </div>
-      </div>
+        <button
+          type="submit"
+          disabled={processing}
+          className={`w-full px-4 py-2 rounded text-white ${processing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}`}
+        >
+          {processing ? 'Processing...' : 'Complete Payment'}
+        </button>
+      </form>
     </div>
   );
 }
