@@ -1,9 +1,11 @@
-'use client';
+"use client";
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+// Interfaces and constants can remain at the top level
 interface RentalDetails {
   id: string;
   box_id: string;
@@ -14,18 +16,22 @@ interface RentalDetails {
   user_name: string;
 }
 
-// Payment method options configuration
 const PAYMENT_METHODS = [
     { value: 'credit_card', label: 'Credit Card' },
     { value: 'bank_transfer', label: 'Bank Transfer' },
     { value: 'digital_wallet', label: 'Digital Wallet' },
 ];
 
-export default function PaymentPage() {
+
+// STEP 1: Move all original page logic into a new client component
+function PaymentClientComponent() {
+  'use client';
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const rentalId = searchParams.get('rentalId');
 
+  // All your original state and logic is pasted here without any changes.
   const [rental, setRental] = useState<RentalDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -44,13 +50,11 @@ export default function PaymentPage() {
       }
 
       try {
-        // First, get the currently authenticated user
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           throw new Error('You must be logged in to complete the payment.');
         }
 
-        // Fetch the details of the pending rental
         const { data: rentalData, error: rentalError } = await supabase
           .from('rentals')
           .select('id, box_id, price, rent_duration, items_type, payment_status')
@@ -61,12 +65,10 @@ export default function PaymentPage() {
           throw new Error('Could not find the rental details for this booking.');
         }
 
-        // Prevent re-payment
         if (rentalData.payment_status === 'paid') {
             throw new Error('This rental has already been paid for.');
         }
 
-        // Fetch the human-readable box code
         const { data: boxData, error: boxError } = await supabase
           .from('boxes')
           .select('box_code')
@@ -77,7 +79,6 @@ export default function PaymentPage() {
           throw new Error('Could not find the associated box details.');
         }
 
-        // Set all the fetched data into state for display
         setRental({
           id: rentalData.id,
           box_id: rentalData.box_id,
@@ -105,20 +106,16 @@ export default function PaymentPage() {
     setProcessing(true);
 
     try {
-      // This is the best practice part: call a single database function
-      // to handle all the complex logic securely and reliably.
       const { error: rpcError } = await supabase.rpc('handle_successful_payment', {
         rental_id_input: rental.id,
         box_id_input: rental.box_id,
         payment_method_input: paymentMethod,
       });
 
-      // If the database function itself returns an error, display it.
       if (rpcError) {
         throw new Error(`Payment processing failed: ${rpcError.message}`);
       }
       
-      // On success, redirect the user to the next step.
       router.push(`/set-pin?rentalId=${rental.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -157,6 +154,7 @@ export default function PaymentPage() {
     );
   }
 
+  // Your original JSX remains here
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
@@ -214,4 +212,14 @@ export default function PaymentPage() {
       </div>
     </div>
   );
+}
+
+
+// STEP 2: The default export is now this clean, simple component.
+export default function PaymentPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading Payment Page...</div>}>
+            <PaymentClientComponent />
+        </Suspense>
+    );
 }

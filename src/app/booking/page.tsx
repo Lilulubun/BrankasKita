@@ -1,9 +1,12 @@
-'use client';
+"use client";
 
+// STEP 1: All imports now live at the top of the file.
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+// Interfaces and constants can remain here.
 interface BookingFormData {
   boxId: string;
   boxCode: string;
@@ -14,7 +17,6 @@ interface BookingFormData {
   itemsType: string;
 }
 
-// Duration pricing configuration
 const DURATION_PRICES = {
   one_day: 5.99,
   three_days: 14.99,
@@ -22,11 +24,16 @@ const DURATION_PRICES = {
   one_month: 99.99,
 };
 
-export default function BookingPage() {
+// STEP 2: The client component contains all the page logic.
+// The 'use client' directive MUST be the first line inside this component.
+function BookingClientComponent() {
+  'use client';
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const boxId = searchParams.get('boxId');
 
+  // The rest of your original page logic remains here, unchanged.
   const [selectedDuration, setSelectedDuration] = useState<string>('');
   const [formData, setFormData] = useState<BookingFormData>({
     boxId: '',
@@ -53,46 +60,19 @@ export default function BookingPage() {
       setLoading(true);
       setError(null);
       try {
-        // Fetch user from Supabase Auth
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          setError('You must be logged in to book a box.');
-          setLoading(false);
-          return;
-        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { throw new Error('You must be logged in to book a box.'); }
 
-        // Fetch user profile data from the 'profiles' table
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, email')
-          .eq('id', user.id)
-          .single();
-
-        // Get user name and email from profile or auth user
+        const { data: profile } = await supabase.from('profiles').select('full_name, email').eq('id', user.id).single();
         const userFullName = profile?.full_name || user.user_metadata?.full_name || '';
         const userEmail = profile?.email || user.email || '';
 
-        // Fetch box info
-        if (!boxId) {
-          setError('No box selected.');
-          setLoading(false);
-          return;
-        }
-        const { data: box, error: boxError } = await supabase
-          .from('boxes')
-          .select('id, box_code, status')
-          .eq('id', boxId)
-          .single();
-        if (boxError || !box) {
-          setError('Box not found.');
-          setLoading(false);
-          return;
-        }
-        if (box.status !== 'available') {
-          setError('Deposit box already rented.');
-          setLoading(false);
-          return;
-        }
+        if (!boxId) { throw new Error('No box selected.'); }
+
+        const { data: box } = await supabase.from('boxes').select('id, box_code, status').eq('id', boxId).single();
+        if (!box) { throw new Error('Box not found.'); }
+        if (box.status !== 'available') { throw new Error('Deposit box already rented.'); }
+
         setFormData({
           boxId: box.id,
           boxCode: box.box_code,
@@ -103,8 +83,8 @@ export default function BookingPage() {
           itemsType: '',
         });
       } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('An unexpected error occurred.');
+        if (err instanceof Error) { setError(err.message); }
+        else { setError('An unexpected error occurred.'); }
       } finally {
         setLoading(false);
       }
@@ -125,82 +105,25 @@ export default function BookingPage() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-
     try {
-      // Fetch user from Supabase Auth
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        setError('You must be logged in to book a box.');
-        setSubmitting(false);
-        return;
-      }
-
-      // Calculate price based on duration
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { throw new Error('You must be logged in to book a box.'); }
       const price = DURATION_PRICES[formData.rentDuration as keyof typeof DURATION_PRICES];
-      
-      if (!price) {
-        throw new Error('Invalid duration selected');
-      }
-
-      // First, ensure user exists in the users table
-      const { error: userCheckError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .single();
-        
+      if (!price) { throw new Error('Invalid duration selected'); }
+      const { error: userCheckError } = await supabase.from('users').select('id').eq('id', user.id).single();
       if (userCheckError) {
-        // User doesn't exist in users table, need to create entry
-        const { error: createUserError } = await supabase
-          .from('users')
-          .insert({
-            id: user.id,
-            email: user.email,
-            full_name: user.user_metadata?.full_name || '',
-            created_at: new Date().toISOString()
-          });
-          
-        if (createUserError) {
-          throw new Error(`Failed to create user record: ${createUserError.message}`);
-        }
+        const { error: createUserError } = await supabase.from('users').insert({ id: user.id, email: user.email, full_name: user.user_metadata?.full_name || '', created_at: new Date().toISOString() });
+        if (createUserError) { throw new Error(`Failed to create user record: ${createUserError.message}`); }
       }
-
-      // Insert new record into rentals table
-      const { data: rental, error: rentalError } = await supabase
-        .from('rentals')
-        .insert({
-          user_id: user.id,
-          box_id: formData.boxId,
-          status: 'pending',
-          price: price,
-          payment_status: 'pending',
-          pin_code: '',
-          items_type: formData.itemsType,
-          rent_duration: formData.rentDuration,
-          barcode: crypto.randomUUID()
-        })
-        .select()
-        .single();
-
-      if (rentalError) {
-        throw new Error(`Failed to create rental: ${rentalError.message}`);
-      }
-
-      // Update box status to 'pending'
-      const { error: boxError } = await supabase
-        .from('boxes')
-        .update({ status: 'pending' })
-        .eq('id', formData.boxId);
-
-      if (boxError) {
-        throw new Error(`Failed to update box status: ${boxError.message}`);
-      }
-
-      // Redirect to payment page with rental ID
+      const { data: rental, error: rentalError } = await supabase.from('rentals').insert({ user_id: user.id, box_id: formData.boxId, status: 'pending', price: price, payment_status: 'pending', pin_code: '', items_type: formData.itemsType, rent_duration: formData.rentDuration, barcode: crypto.randomUUID() }).select().single();
+      if (rentalError) { throw new Error(`Failed to create rental: ${rentalError.message}`); }
+      const { error: boxError } = await supabase.from('boxes').update({ status: 'pending' }).eq('id', formData.boxId);
+      if (boxError) { throw new Error(`Failed to update box status: ${boxError.message}`); }
       router.push(`/payment?rentalId=${rental.id}`);
     } catch (err) {
-      console.error('Error submitting form:', err);
-      setError(err instanceof Error ? err.message : 'Failed to process your booking. Please try again.');
+      if (err instanceof Error) { setError(err.message); }
+      else { setError('An unexpected error occurred.'); }
+    } finally {
       setSubmitting(false);
     }
   };
@@ -212,7 +135,6 @@ export default function BookingPage() {
       </div>
     );
   }
-
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -221,11 +143,11 @@ export default function BookingPage() {
     );
   }
 
+  // Your original JSX remains here
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Book a Deposit Box</h2>
-        {/* Pre-filled Information */}
         <div className="mb-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Box ID</label>
@@ -244,7 +166,6 @@ export default function BookingPage() {
             <p className="mt-1 text-gray-900">{formData.userEmail}</p>
           </div>
         </div>
-        {/* Form Fields */}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-4">
@@ -273,8 +194,6 @@ export default function BookingPage() {
               ))}
             </div>
           </div>
-          
-          {/* Items Type Field */}
           <div>
             <label htmlFor="itemsType" className="block text-sm font-medium text-gray-700">
               What items will you store?
@@ -290,7 +209,6 @@ export default function BookingPage() {
               required
             />
           </div>
-          
           <button
             type="submit"
             disabled={!selectedDuration || !formData.itemsType || submitting}
@@ -305,5 +223,15 @@ export default function BookingPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+
+// STEP 3: The default export is now the clean wrapper component.
+export default function BookingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading Booking Page...</div>}>
+      <BookingClientComponent />
+    </Suspense>
   );
 }
