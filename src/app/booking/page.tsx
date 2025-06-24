@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import Barcode from 'react-barcode';
 
 interface Box {
   id: string;
@@ -183,7 +184,8 @@ export default function BookingPage() {
           payment_status: 'pending',
           pin_code: '',
           items_type: formData.itemsType,
-          rent_duration: formData.rentDuration
+          rent_duration: formData.rentDuration,
+          barcode: crypto.randomUUID()
         })
         .select()
         .single();

@@ -38,19 +38,19 @@ export default function PaymentPage() {
       setError(null);
 
       if (!rentalId) {
-        setError('No rental ID provided.');
+        setError('Error: No rental ID provided in the URL.');
         setLoading(false);
         return;
       }
 
       try {
+        // First, get the currently authenticated user
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          setError('You must be logged in to complete the payment.');
-          setLoading(false);
-          return;
+          throw new Error('You must be logged in to complete the payment.');
         }
 
+        // Fetch the details of the pending rental
         const { data: rentalData, error: rentalError } = await supabase
           .from('rentals')
           .select('id, box_id, price, rent_duration, items_type, payment_status')
@@ -58,15 +58,15 @@ export default function PaymentPage() {
           .single();
 
         if (rentalError || !rentalData) {
-          throw new Error('Failed to load rental details.');
+          throw new Error('Could not find the rental details for this booking.');
         }
 
+        // Prevent re-payment
         if (rentalData.payment_status === 'paid') {
-            setError('This rental has already been paid for.');
-            setLoading(false);
-            return;
+            throw new Error('This rental has already been paid for.');
         }
 
+        // Fetch the human-readable box code
         const { data: boxData, error: boxError } = await supabase
           .from('boxes')
           .select('box_code')
@@ -74,9 +74,10 @@ export default function PaymentPage() {
           .single();
 
         if (boxError || !boxData) {
-          throw new Error('Failed to load box details.');
+          throw new Error('Could not find the associated box details.');
         }
 
+        // Set all the fetched data into state for display
         setRental({
           id: rentalData.id,
           box_id: rentalData.box_id,
@@ -84,10 +85,10 @@ export default function PaymentPage() {
           price: rentalData.price,
           rent_duration: rentalData.rent_duration,
           items_type: rentalData.items_type,
-          user_name: user.user_metadata?.full_name || user.email || '',
+          user_name: user.user_metadata?.full_name || user.email || 'N/A',
         });
       } catch (err: any) {
-        setError(err.message || 'An unexpected error occurred.');
+        setError(err.message || 'An unexpected error occurred while loading details.');
       } finally {
         setLoading(false);
       }
@@ -104,17 +105,20 @@ export default function PaymentPage() {
     setProcessing(true);
 
     try {
-      // Use the robust RPC function for an atomic transaction
+      // This is the best practice part: call a single database function
+      // to handle all the complex logic securely and reliably.
       const { error: rpcError } = await supabase.rpc('handle_successful_payment', {
         rental_id_input: rental.id,
         box_id_input: rental.box_id,
         payment_method_input: paymentMethod,
       });
 
+      // If the database function itself returns an error, display it.
       if (rpcError) {
         throw new Error(`Payment processing failed: ${rpcError.message}`);
       }
       
+      // On success, redirect the user to the next step.
       router.push(`/set-pin?rentalId=${rental.id}`);
     } catch (err: any) {
       setError(err.message);
@@ -133,8 +137,14 @@ export default function PaymentPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-white p-6 rounded shadow-md text-red-600 text-lg">{error}</div>
+      <div className="min-h-screen flex items-center justify-center text-center">
+        <div className="bg-white p-8 rounded shadow-md">
+            <h3 className="text-xl font-bold text-red-600 mb-4">Payment Error</h3>
+            <p className="text-gray-700">{error}</p>
+            <button onClick={() => router.push('/')} className="mt-6 bg-gray-800 text-white px-6 py-2 rounded-lg">
+                Back to Home
+            </button>
+        </div>
       </div>
     );
   }
@@ -152,7 +162,6 @@ export default function PaymentPage() {
       <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Complete Your Payment</h2>
         
-        {/* Payment Details Section */}
         <div className="mb-6 space-y-4 border-t border-b border-gray-200 py-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Payer</label>
@@ -172,7 +181,6 @@ export default function PaymentPage() {
           </div>
         </div>
 
-        {/* Payment Form */}
         <form onSubmit={handlePayment} className="space-y-6">
           <div>
             <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700">
@@ -194,7 +202,7 @@ export default function PaymentPage() {
           <button
             type="submit"
             disabled={processing}
-            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
+            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white transition-colors
               ${!processing
                 ? 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
                 : 'bg-gray-400 cursor-not-allowed'

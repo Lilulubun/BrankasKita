@@ -103,6 +103,8 @@ export default function Navbar(): React.ReactElement {
               {user ? (
                 <>
                   <Link href="/my-orders" className="dropdownItem">My Orders</Link>
+                  <Link href="/notifications" className="dropdownItem">Notifications</Link>
+                  <Link href="/my-profile" className="dropdownItem">My Profile</Link>
                   <button onClick={handleLogout} className="dropdownItem w-full text-left">Logout</button>
                 </>
               ) : (

@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+// NEW: An interface to hold the data we'll need for the notification email.
+interface PinPageData {
+  userEmail: string;
+  userName: string;
+  boxCode: string;
+}
+
 export default function SetPinPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -15,8 +22,12 @@ export default function SetPinPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // NEW: State to store the notification data we fetch.
+  const [pageData, setPageData] = useState<PinPageData | null>(null);
+
+  // MODIFIED: This useEffect now fetches all necessary data for validation and notification.
   useEffect(() => {
-    const checkPaymentStatus = async () => {
+    const fetchInitialData = async () => {
       setLoading(true);
       setError(null);
 
@@ -27,21 +38,46 @@ export default function SetPinPage() {
       }
 
       try {
-        const { data, error: fetchError } = await supabase
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('You must be logged in to set a PIN.');
+        }
+
+        const { data: rentalData, error: fetchError } = await supabase
           .from('rentals')
-          .select('payment_status, pin_code')
+          .select('payment_status, pin_code, box_id') // Added box_id to the query
           .eq('id', rentalId)
           .single();
 
-        if (fetchError || !data) {
+        if (fetchError || !rentalData) {
           throw new Error('Could not verify rental status.');
         }
 
-        if (data.payment_status !== 'paid') {
+        // Your original validation checks remain the same
+        if (rentalData.payment_status !== 'paid') {
           setError('Payment for this rental has not been completed.');
-        } else if (data.pin_code) {
+        } else if (rentalData.pin_code) {
           setError('A PIN has already been set for this rental.');
         }
+
+        // NEW: Fetch the box code needed for the notification email
+        const { data: boxData, error: boxError } = await supabase
+          .from('boxes')
+          .select('box_code')
+          .eq('id', rentalData.box_id)
+          .single();
+
+        if (boxError || !boxData) {
+            throw new Error('Could not load box details.');
+        }
+        
+        // NEW: Store all the fetched data in state so handleSubmit can use it
+        setPageData({
+            userEmail: user.email!,
+            userName: user.user_metadata?.full_name || 'Valued Customer',
+            boxCode: boxData.box_code,
+        });
+
       } catch (err: any) {
         setError(err.message || 'An unexpected error occurred.');
       } finally {
@@ -49,9 +85,10 @@ export default function SetPinPage() {
       }
     };
 
-    checkPaymentStatus();
+    fetchInitialData();
   }, [rentalId]);
 
+  // MODIFIED: Your handleSubmit function now triggers the notification.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -60,31 +97,59 @@ export default function SetPinPage() {
       setError('PIN must be exactly 4 digits.');
       return;
     }
+    
+    // NEW: Guard clause to ensure we have notification data before submitting.
+    if (!pageData) {
+        setError('Page data is still loading. Please try again in a moment.');
+        return;
+    }
 
     setSubmitting(true);
 
     try {
+      // Step 1: Your original logic to save the PIN.
       const { error: updateError } = await supabase
         .from('rentals')
-        .update({ pin_code: pin })
+        .update({ pin_code: pin }) // For production, this PIN should be hashed for security.
         .eq('id', rentalId);
 
       if (updateError) {
         throw new Error('Failed to save PIN. Please try again.');
       }
+      
+      // --- NEW NOTIFICATION LOGIC ---
+      // Step 2: After successfully saving the PIN, trigger the notification.
+      try {
+        await supabase.functions.invoke('send-email', {
+          body: {
+            template: 'pin-set-successfully',
+            email: pageData.userEmail,
+            name: pageData.userName,
+            box_code: pageData.boxCode
+          }
+        });
+      } catch (invokeError) {
+        // If the email fails, we log it but don't block the user.
+        // The most important thing (setting the PIN) was successful.
+        console.error("PIN was set, but failed to send confirmation email:", invokeError);
+      }
+      // --- END OF NEW LOGIC ---
 
       setSuccess(true);
-      // Redirect after a short delay to allow the user to see the success message
+      
+      // Step 3: Your original redirect logic.
       setTimeout(() => {
         router.push(`/confirmation?rentalId=${rentalId}`);
       }, 2000);
 
-    } catch (err: any) {
+    } catch (err: any)
+       {
       setError(err.message);
       setSubmitting(false);
     }
   };
 
+  // Your original handlePinChange function
   const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
     if (value.length <= 4) {
@@ -92,7 +157,7 @@ export default function SetPinPage() {
     }
   };
   
-  // Loading State
+  // Your original JSX for Loading, Error, and Success states
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -101,7 +166,6 @@ export default function SetPinPage() {
     );
   }
 
-  // Error State
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -110,7 +174,6 @@ export default function SetPinPage() {
     );
   }
 
-  // Success State
   if (success) {
       return (
       <div className="min-h-screen flex items-center justify-center">
@@ -122,6 +185,7 @@ export default function SetPinPage() {
     );
   }
 
+  // Your original form JSX
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
