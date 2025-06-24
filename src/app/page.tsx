@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import BoxIcon from "./components/BoxIcons/BoxIcon";
-import TestConnection from "./components/TestConnection";
 import Link from 'next/link';
 import Modal from "./components/Modal";
 import { useRouter } from "next/navigation";
@@ -21,7 +20,6 @@ export default function Home() {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const bookingRef = useRef<HTMLDivElement>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {

@@ -31,8 +31,8 @@ export default function LoginPage(): React.ReactElement {
       if (data?.user) {
         router.push('/'); // Redirect to home page after successful login
       }
-    } catch (error: any) {
-      setError(error.message || 'An error occurred during login');
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'An error occurred during login');
     } finally {
       setLoading(false);
     }
@@ -54,8 +54,8 @@ export default function LoginPage(): React.ReactElement {
       if (error) {
         throw error;
       }
-    } catch (error: any) {
-      setError(error.message || 'An error occurred during Google login');
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'An error occurred during Google login');
     }
   };
 

@@ -78,8 +78,8 @@ export default function SetPinPage() {
             boxCode: boxData.box_code,
         });
 
-      } catch (err: any) {
-        setError(err.message || 'An unexpected error occurred.');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
       } finally {
         setLoading(false);
       }
@@ -142,9 +142,8 @@ export default function SetPinPage() {
         router.push(`/confirmation?rentalId=${rentalId}`);
       }, 2000);
 
-    } catch (err: any)
-       {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       setSubmitting(false);
     }
   };

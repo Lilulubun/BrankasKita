@@ -26,7 +26,7 @@ export default function NotificationsPage() {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)

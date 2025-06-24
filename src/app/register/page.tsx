@@ -66,9 +66,9 @@ export default function RegisterPage(): React.ReactElement {
 
         router.push('/login');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Registration error:', error);
-      setError(error?.message || 'An unexpected error occurred during registration');
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred during registration');
     } finally {
       setLoading(false);
     }
@@ -92,9 +92,9 @@ export default function RegisterPage(): React.ReactElement {
         setError(error.message || 'An error occurred during Google login');
         return;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Google login error:', error);
-      setError(error?.message || 'An unexpected error occurred during Google login');
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred during Google login');
     }
   };
 

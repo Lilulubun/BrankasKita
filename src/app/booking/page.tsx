@@ -3,14 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import Barcode from 'react-barcode';
-
-interface Box {
-  id: string;
-  box_code: string;
-  status: string;
-  items_type?: string;
-}
 
 interface BookingFormData {
   boxId: string;
@@ -70,7 +62,7 @@ export default function BookingPage() {
         }
 
         // Fetch user profile data from the 'profiles' table
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('full_name, email')
           .eq('id', user.id)
@@ -151,7 +143,7 @@ export default function BookingPage() {
       }
 
       // First, ensure user exists in the users table
-      const { data: existingUser, error: userCheckError } = await supabase
+      const { error: userCheckError } = await supabase
         .from('users')
         .select('id')
         .eq('id', user.id)

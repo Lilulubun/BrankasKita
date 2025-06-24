@@ -87,8 +87,8 @@ export default function PaymentPage() {
           items_type: rentalData.items_type,
           user_name: user.user_metadata?.full_name || user.email || 'N/A',
         });
-      } catch (err: any) {
-        setError(err.message || 'An unexpected error occurred while loading details.');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred while loading details.');
       } finally {
         setLoading(false);
       }
@@ -120,8 +120,8 @@ export default function PaymentPage() {
       
       // On success, redirect the user to the next step.
       router.push(`/set-pin?rentalId=${rental.id}`);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setProcessing(false);
     }

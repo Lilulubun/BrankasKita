@@ -7,16 +7,12 @@ import './navbar.css';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { User } from '@supabase/supabase-js';
 
-// Define types for the navigation items
-interface NavItem {
-  id: string;
-  label: string;
-}
 
 export default function Navbar(): React.ReactElement {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -74,12 +70,12 @@ export default function Navbar(): React.ReactElement {
 
       <div className='right-side-nav'>
         <div className="nav-links">
-          <a href="/" className="nav-item active" onClick={(e) => handleNavClick(e, 'hero')}>
+          <Link href="/" className="nav-item active" onClick={(e) => handleNavClick(e, 'hero')}>
             Home
-          </a>
-          <a href="#booking" className="nav-item" onClick={(e) => handleNavClick(e, 'booking')}>
+          </Link>
+          <Link href="#booking" className="nav-item" onClick={(e) => handleNavClick(e, 'booking')}>
             Booking
-          </a>
+          </Link>
         </div>
         <div 
           className="userIconContainer"

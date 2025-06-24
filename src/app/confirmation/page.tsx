@@ -69,8 +69,8 @@ export default function ConfirmationPage() {
           user_name: user.user_metadata?.full_name || 'Valued Customer',
           barcode: rentalData.barcode
         });
-      } catch (err: any) {
-        setError(err.message || 'An unexpected error occurred');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       } finally {
         setLoading(false);
       }

@@ -1,4 +1,4 @@
-import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 interface BoxIconProps {
   id: string;
@@ -22,7 +22,7 @@ export default function BoxIcon({ id, status, boxCode, onAvailable, onUnavailabl
   return (
     <div className="flex flex-col items-center space-y-2">
       <div className="relative group cursor-pointer" onClick={handleClick}>
-        <img
+        <Image
           src="/box.svg"
           alt={`Box ${boxCode}`}
           className={`w-40 h-40 transition-colors duration-200 ${
