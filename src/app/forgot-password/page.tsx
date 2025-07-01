@@ -14,19 +14,31 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setMessage('');
     setError('');
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      // This is the URL of the page you will create in Step 2
-      redirectTo: `${window.location.origin}/update-password`,
-    });
-
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
+  
+    try {
+      // This now calls our new, reliable Edge Function
+      const { error } = await supabase.functions.invoke('custom-password-reset', {
+        body: { email: email },
+      });
+  
+      if (error) {
+        throw error;
+      }
+      
+      // We show a generic message for security, even if the email doesn't exist.
       setMessage('If an account exists for this email, a password reset link has been sent.');
+  
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
+  
 
   return (
     <div className="max-w-md mx-auto p-8">
