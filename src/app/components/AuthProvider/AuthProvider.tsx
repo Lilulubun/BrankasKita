@@ -4,7 +4,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 // Create a context to hold the session information
 const AuthContext = createContext<{ session: Session | null }>({ session: null });
