@@ -1,10 +1,10 @@
 // src/app/components/AuthProvider/AuthProvider.tsx
 'use client';
 
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 const AuthContext = createContext<{ session: Session | null }>({ session: null });
 
@@ -12,10 +12,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  
-  // THIS IS THE FIX: A flag to track if we are in the middle of a password recovery.
-  // We use a `useRef` here because its value persists across re-renders without causing them.
-  const isRecoveringPassword = useRef(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const getInitialSession = async () => {
@@ -29,26 +26,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         
-        // When the user lands from the email link, this event fires first.
-        if (event === 'PASSWORD_RECOVERY') {
-          // We set our flag to true.
-          isRecoveringPassword.current = true;
+        // THIS IS THE CRITICAL FIX:
+        // If the user is currently on the /update-password page, we only update
+        // the session state but we NEVER redirect them. This allows the
+        // update-password page to handle the recovery event itself.
+        if (pathname === '/update-password') {
           setSession(currentSession);
           return;
         }
 
-        // When the user signs in...
+        // --- The rest of the logic runs for all other pages ---
+
         if (event === 'SIGNED_IN') {
-          // ...we check our flag. If a password recovery just happened,
-          // we DO NOT redirect. We reset the flag and let the user
-          // stay on the /update-password page.
-          if (isRecoveringPassword.current) {
-            isRecoveringPassword.current = false;
-            setSession(currentSession);
-            return;
-          }
-          
-          // If it's a normal sign-in, we redirect to the homepage.
           setSession(currentSession);
           router.push('/');
         }
@@ -63,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, pathname]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading Application...</div>;
