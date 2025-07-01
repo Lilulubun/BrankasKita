@@ -20,7 +20,7 @@ function UpdatePasswordClientComponent() {
   // event that Supabase fires when the user lands on this page from the email link.
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (event) => {
         if (event === "PASSWORD_RECOVERY") {
           // This event confirms the user is in the correct, secure state.
           // We can now show them the form.
