@@ -4,71 +4,72 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
-// Create a context to hold the session information
+// Create a context to hold the session information.
+// We are not exporting this as the useAuth hook is the preferred way to access it.
 const AuthContext = createContext<{ session: Session | null }>({ session: null });
 
-// This is the provider component that will wrap your app
+// This is the provider component that will wrap your entire application.
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  
+  const pathname = usePathname();
 
   useEffect(() => {
-    // This function runs once to get the initial session
+    // This function runs once on initial load to get the current session.
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      setSession(initialSession);
       setLoading(false);
     };
 
     getInitialSession();
 
-    // This is the key part: it listens for ALL auth changes
+    // This listener reacts to all authentication events (sign in, sign out, etc.).
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        console.log('Auth event:', event); // For debugging
-
-        // THIS IS THE FIX:
-        // If the event is PASSWORD_RECOVERY, it means the user just clicked
-        // the reset link. We set the session so they are "logged in" temporarily,
-        // but we DO NOT redirect them. We let them stay on the /update-password page.
-        if (event === 'PASSWORD_RECOVERY') {
+        
+        // THIS IS THE CRITICAL FIX:
+        // If the user is on the /update-password page, we do NOTHING.
+        // We let that page handle its own logic. We only set the session
+        // so the page knows the user is in a recovery state.
+        if (pathname === '/update-password') {
           setSession(currentSession);
-          return; 
-        }
-
-        // If the user signs out, redirect them to the login page
-        if (event === 'SIGNED_OUT') {
-          setSession(null);
-          router.push('/login');
           return;
         }
 
-        // If the user signs in (and it's not a password recovery)...
+        // --- The rest of the logic runs for all other pages ---
+
+        // When a user signs in (and it's not a password recovery)...
         if (event === 'SIGNED_IN') {
           setSession(currentSession);
           // ...redirect them to the homepage.
           router.push('/');
-          return;
+        }
+
+        // When a user signs out...
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          // ...redirect them to the login page.
+          router.push('/login');
         }
       }
     );
 
-    // Cleanup the listener when the component unmounts
+    // Cleanup the listener when the component is no longer on screen.
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, pathname]); // This effect re-runs if the user navigates to a new page.
 
-  // While we're checking for the initial session, you can show a loader
+  // While checking for the session, show a global loading screen.
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading Application...</div>;
   }
 
-  // Once loaded, render the rest of the application
+  // Once loaded, render the rest of the application.
   return (
     <AuthContext.Provider value={{ session }}>
       {children}
@@ -76,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// A custom hook to easily access the session from any client component
+// This is a custom hook that makes it easy to access the session from any client component.
 export const useAuth = () => {
   return useContext(AuthContext);
 };
