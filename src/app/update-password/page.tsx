@@ -1,44 +1,47 @@
+// src/app/update-password/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-export default function UpdatePasswordPage() {
+// This is the component that contains all the logic.
+// It will only be rendered in the browser, which is what we need.
+function UpdatePasswordClientComponent() {
   const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  
-  // This new state controls what the user sees.
-  const [status, setStatus] = useState<'verifying' | 'ready' | 'redirecting'>('verifying');
+  const [status, setStatus] = useState<'verifying' | 'ready' | 'submitting' | 'success'>('verifying');
 
-  // This useEffect hook is the key to the fix.
-  // It runs once and determines if the user is in the correct password recovery flow.
+  // This useEffect is the key. It listens for the special 'PASSWORD_RECOVERY'
+  // event that Supabase fires when the user lands on this page from the email link.
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      // This event fires specifically when the user lands on the page from the reset email.
-      if (event === 'PASSWORD_RECOVERY') {
-        // The user is in the correct flow. We can show them the form.
-        setStatus('ready');
-      } else if (session) {
-        // A user is already logged in, but it's NOT a password recovery.
-        // This means they navigated here by mistake. Redirect them.
-        setStatus('redirecting');
-        router.replace('/');
-      } else {
-        // No session and no recovery event means the link is invalid or expired.
-        setError('Invalid or expired password reset link. Please try again.');
-        setStatus('ready'); // Show the error message.
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "PASSWORD_RECOVERY") {
+          // This event confirms the user is in the correct, secure state.
+          // We can now show them the form.
+          setStatus('ready');
+        }
       }
-    });
+    );
+
+    // This timer handles the case where the link is invalid from the start.
+    const timer = setTimeout(() => {
+        if (status === 'verifying') {
+            setError("Invalid or expired password reset link. Please request a new one.");
+            setStatus('ready'); // Move to 'ready' to show the error message.
+        }
+    }, 3000);
 
     return () => {
       authListener.subscription.unsubscribe();
+      clearTimeout(timer);
     };
-  }, [router]);
+  }, [status]); // The dependency array ensures this runs correctly.
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,71 +49,80 @@ export default function UpdatePasswordPage() {
       setError("Passwords do not match.");
       return;
     }
-    setLoading(true);
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+    
+    setStatus('submitting');
     setMessage('');
     setError('');
 
-    const { error } = await supabase.auth.updateUser({
+    // This function will now work because the Supabase client has correctly
+    // maintained the temporary session from the PASSWORD_RECOVERY event.
+    const { error: updateError } = await supabase.auth.updateUser({
       password: password,
     });
 
-    setLoading(false);
-    if (error) {
-      setError(error.message);
+    if (updateError) {
+      setError(updateError.message);
+      setStatus('ready');
     } else {
       setMessage('Your password has been updated successfully! Redirecting to login...');
+      setStatus('success');
       setTimeout(() => {
         router.push('/login');
       }, 3000);
     }
   };
 
-  // Render different UI based on the current status
   if (status === 'verifying') {
     return (
-        <div className="max-w-md mx-auto p-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">Verifying Link...</h2>
-            <p>Please wait while we verify your password reset request.</p>
-        </div>
-    );
-  }
-  
-  if (status === 'redirecting') {
-    return (
-        <div className="max-w-md mx-auto p-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">Redirecting...</h2>
-            <p>You are already logged in.</p>
+        <div className="min-h-screen flex items-center justify-center">
+            <p>Verifying your link...</p>
         </div>
     );
   }
 
-  // If status is 'ready', show the form (or an error message).
   return (
-    <div className="max-w-md mx-auto p-8">
-      <h2 className="text-2xl font-bold mb-4">Update Your Password</h2>
-      <form onSubmit={handleUpdatePassword}>
-        <input
-          type="password"
-          placeholder="Enter your new password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="w-full p-2 border rounded mb-4"
-        />
-        <input
-          type="password"
-          placeholder="Confirm your new password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          className="w-full p-2 border rounded mb-4"
-        />
-        <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white p-2 rounded">
-          {loading ? 'Updating...' : 'Update Password'}
-        </button>
-      </form>
-      {message && <p className="text-green-600 mt-4">{message}</p>}
-      {error && <p className="text-red-600 mt-4">{error}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+          <h2 className="text-2xl font-bold text-center text-gray-900 mb-4">Update Your Password</h2>
+          {status !== 'success' && (
+            <form onSubmit={handleUpdatePassword} className="space-y-6">
+                <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">New Password</label>
+                    <input
+                    type="password" id="password" placeholder="Enter your new password"
+                    value={password} onChange={(e) => setPassword(e.target.value)}
+                    required className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">Confirm New Password</label>
+                    <input
+                    type="password" id="confirmPassword" placeholder="Confirm your new password"
+                    value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                    required className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm"
+                    />
+                </div>
+                <button type="submit" disabled={status === 'submitting'} className="w-full flex justify-center py-3 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400">
+                    {status === 'submitting' ? 'Updating...' : 'Update Password'}
+                </button>
+            </form>
+          )}
+          {message && <p className="text-green-600 mt-4 text-center">{message}</p>}
+          {error && <p className="text-red-600 mt-4 text-center">{error}</p>}
+        </div>
     </div>
   );
+}
+
+// The main page component is now a simple wrapper that uses <Suspense>.
+export default function UpdatePasswordPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+            <UpdatePasswordClientComponent />
+        </Suspense>
+    );
 }
