@@ -1,8 +1,11 @@
+// src/app/layout.tsx
+
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from './components/Navbar/Navbar';
 import Footer from './components/Footer/Footer';
+import { AuthProvider } from "./components/AuthProvider/AuthProvider"; // <-- 1. IMPORT
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: '--plus-jakarta-sans',
@@ -24,9 +27,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={plusJakartaSans.className} suppressHydrationWarning>
-          <Navbar />
-          {children}
-          <Footer />
+          {/* 2. WRAP YOUR APP WITH THE PROVIDER */}
+          <AuthProvider>
+            <Navbar />
+            {children}
+            <Footer />
+          </AuthProvider>
       </body>
     </html>
   );
