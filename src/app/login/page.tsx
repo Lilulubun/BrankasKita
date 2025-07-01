@@ -140,7 +140,7 @@ export default function LoginPage(): React.ReactElement {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-black hover:text-gray-800">
+                <a href="/forgot-password" className="font-medium text-grey-500 hover:text-gray-800">
                   Forgot your password?
                 </a>
               </div>
