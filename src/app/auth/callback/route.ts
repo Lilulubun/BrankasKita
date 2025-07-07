@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
   // 1️⃣ OAuth / magic link flow
   if (code) {
-    const { data: { session }, error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       console.error('❌ Error exchanging code:', error.message);
       return NextResponse.redirect(new URL('/login?error=auth', requestUrl.origin));
