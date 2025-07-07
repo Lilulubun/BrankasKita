@@ -1,70 +1,57 @@
-// src/app/components/AuthProvider/AuthProvider.tsx
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
-import { useRouter, usePathname } from 'next/navigation';
 
-const AuthContext = createContext<{ session: Session | null }>({ session: null });
+// Define the shape of our context
+type AuthContextType = {
+  session: Session | null;
+  loading: boolean;
+};
 
+// Create the context
+const AuthContext = createContext<AuthContextType>({
+  session: null,
+  loading: true,
+});
+
+// Create the provider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
+    // Get the initial session when the app loads
     const getInitialSession = async () => {
-      const { data: { session: initialSession } } = await supabase.auth.getSession();
-      setSession(initialSession);
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
       setLoading(false);
     };
 
     getInitialSession();
 
+    // Set up the single, central listener for any auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        
-        // THIS IS THE CRITICAL FIX:
-        // If the user is currently on the /update-password page, we only update
-        // the session state but we NEVER redirect them. This allows the
-        // update-password page to handle the recovery event itself.
-        if (pathname === '/update-password') {
-          setSession(currentSession);
-          return;
-        }
-
-        // --- The rest of the logic runs for all other pages ---
-
-        if (event === 'SIGNED_IN') {
-          setSession(currentSession);
-          router.push('/');
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setSession(null);
-          router.push('/login');
-        }
+      (_event, currentSession) => {
+        setSession(currentSession);
       }
     );
 
+    // Cleanup the listener when the component unmounts
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [router, pathname]);
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading Application...</div>;
-  }
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ session }}>
-      {children}
+    <AuthContext.Provider value={{ session, loading }}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
 
+// Create a custom hook to easily use the auth context in your components
 export const useAuth = () => {
   return useContext(AuthContext);
 };
