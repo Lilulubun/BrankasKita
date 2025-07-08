@@ -15,7 +15,7 @@ const EXTENSION_PRICES = {
 // Define an interface for the rental data we fetch
 interface ActiveRental {
   id: string;
-  box_id: string; // We need box_id to fetch the box_code
+  box_id: string;
   box_code: string;
   current_end_date: string;
 }
@@ -40,7 +40,6 @@ function ExtendDurationClientComponent() {
     { value: 'one_week', label: 'Add One Week' },
   ];
 
-  // UPDATED: This useEffect now uses two simple queries instead of one complex one.
   useEffect(() => {
     const fetchRentalDetails = async () => {
       if (!rentalId) {
@@ -49,7 +48,6 @@ function ExtendDurationClientComponent() {
         return;
       }
       try {
-        // Step 1: Fetch the rental details first.
         const { data: rentalData, error: rentalError } = await supabase
           .from('rentals')
           .select('id, end_date, status, box_id')
@@ -59,7 +57,6 @@ function ExtendDurationClientComponent() {
         if (rentalError || !rentalData) throw new Error("Could not find this rental.");
         if (rentalData.status !== 'active') throw new Error("This rental is not active and cannot be extended.");
 
-        // Step 2: If the rental is found, use its box_id to fetch the box details.
         const { data: boxData, error: boxError } = await supabase
             .from('boxes')
             .select('box_code')
@@ -68,7 +65,6 @@ function ExtendDurationClientComponent() {
         
         if (boxError || !boxData) throw new Error("Could not find the associated box details for this rental.");
 
-        // Step 3: Combine the data into our state object.
         setRental({
           id: rentalData.id,
           box_id: rentalData.box_id,
@@ -98,7 +94,7 @@ function ExtendDurationClientComponent() {
       const { error: rpcError } = await supabase.rpc('handle_rental_extension', {
         rental_id_input: rental.id,
         duration_to_add: selectedDuration,
-        payment_method_input: 'credit_card', // Or get from a form
+        payment_method_input: 'credit_card',
         extension_price: price,
       });
 
@@ -120,8 +116,10 @@ function ExtendDurationClientComponent() {
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Extend Your Rental</h2>
+        
+        {/* IMPROVEMENT: Cleaned up description text */}
         <p className="text-gray-600 mb-6">
-          Your rental for **Box {rental?.box_code}** currently ends on **{rental?.current_end_date}**.
+          Your rental for <strong className="font-semibold text-gray-800">Box {rental?.box_code}</strong> currently ends on <strong className="font-semibold text-gray-800">{rental?.current_end_date}</strong>.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -144,13 +142,23 @@ function ExtendDurationClientComponent() {
             </div>
           </div>
           
-          <button
-            type="submit"
-            disabled={!selectedDuration || submitting}
-            className="w-full flex justify-center py-3 px-4 border rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
-          >
-            {submitting ? 'Processing Payment...' : 'Pay and Extend'}
-          </button>
+          <div className="flex flex-col sm:flex-row-reverse gap-3 mt-8">
+            <button
+              type="submit"
+              disabled={!selectedDuration || submitting}
+              className="w-full flex justify-center py-3 px-4 border rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+            >
+              {submitting ? 'Processing Payment...' : 'Pay and Extend'}
+            </button>
+            {/* IMPROVEMENT: Added a back button */}
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Back to My Order
+            </button>
+          </div>
         </form>
       </div>
     </div>
