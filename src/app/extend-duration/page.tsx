@@ -1,4 +1,3 @@
-'use client';
 import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -14,6 +13,7 @@ const EXTENSION_PRICES = {
 // Define an interface for the rental data we fetch
 interface ActiveRental {
   id: string;
+  box_id: string; // We need box_id to fetch the box_code
   box_code: string;
   current_end_date: string;
 }
@@ -38,6 +38,7 @@ function ExtendDurationClientComponent() {
     { value: 'one_week', label: 'Add One Week' },
   ];
 
+  // UPDATED: This useEffect now uses two simple queries instead of one complex one.
   useEffect(() => {
     const fetchRentalDetails = async () => {
       if (!rentalId) {
@@ -46,25 +47,33 @@ function ExtendDurationClientComponent() {
         return;
       }
       try {
+        // Step 1: Fetch the rental details first.
         const { data: rentalData, error: rentalError } = await supabase
           .from('rentals')
-          .select(`id, end_date, status, boxes(box_code)`)
+          .select('id, end_date, status, box_id')
           .eq('id', rentalId)
           .single();
 
         if (rentalError || !rentalData) throw new Error("Could not find this rental.");
         if (rentalData.status !== 'active') throw new Error("This rental is not active and cannot be extended.");
 
-        // FIX: Access the first element of the 'boxes' array
-        const boxCode = Array.isArray(rentalData.boxes) && rentalData.boxes.length > 0
-          ? rentalData.boxes[0].box_code
-          : 'N/A';
+        // Step 2: If the rental is found, use its box_id to fetch the box details.
+        const { data: boxData, error: boxError } = await supabase
+            .from('boxes')
+            .select('box_code')
+            .eq('id', rentalData.box_id)
+            .single();
+        
+        if (boxError || !boxData) throw new Error("Could not find the associated box details for this rental.");
 
+        // Step 3: Combine the data into our state object.
         setRental({
           id: rentalData.id,
-          box_code: boxCode,
+          box_id: rentalData.box_id,
+          box_code: boxData.box_code,
           current_end_date: new Date(rentalData.end_date).toLocaleString(),
         });
+
       } catch (err) {
         if (err instanceof Error) setError(err.message);
       } finally {
@@ -93,7 +102,6 @@ function ExtendDurationClientComponent() {
 
       if (rpcError) throw rpcError;
 
-      // On success, redirect back to the My Orders page to see the updated date
       router.push('/my-orders?extended=true');
 
     } catch (err) {
