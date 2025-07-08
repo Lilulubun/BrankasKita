@@ -40,6 +40,7 @@ function SeeDetailsClientComponent() {
     });
   };
 
+  // UPDATED: This useEffect now uses three simple queries instead of one complex one.
   useEffect(() => {
     const fetchDetails = async () => {
       if (!rentalId) {
@@ -48,36 +49,48 @@ function SeeDetailsClientComponent() {
         return;
       }
       try {
-        // Fetch all necessary data in one go using nested selects
-        const { data, error: fetchError } = await supabase
+        // Step 1: Fetch the main rental details.
+        const { data: rentalData, error: rentalError } = await supabase
           .from('rentals')
-          .select(`
-            status,
-            pin_code,
-            start_date,
-            end_date,
-            items_type,
-            boxes ( box_code ),
-            payments ( amount )
-          `)
+          .select('status, pin_code, start_date, end_date, items_type, box_id')
           .eq('id', rentalId)
           .single();
 
-        if (fetchError || !data) {
+        if (rentalError || !rentalData) {
           throw new Error("Could not find details for this rental.");
         }
 
-        // Safely access nested data
-        const boxCode = Array.isArray(data.boxes) && data.boxes.length > 0 ? data.boxes[0].box_code : 'N/A';
-        const totalPaid = Array.isArray(data.payments) ? data.payments.reduce((sum, p) => sum + p.amount, 0) : 0;
+        // Step 2: Fetch the associated box details.
+        const { data: boxData, error: boxError } = await supabase
+          .from('boxes')
+          .select('box_code')
+          .eq('id', rentalData.box_id)
+          .single();
 
+        if (boxError || !boxData) {
+            throw new Error("Could not find the associated box details.");
+        }
+
+        // Step 3: Fetch all associated payments and sum them up.
+        const { data: paymentsData, error: paymentsError } = await supabase
+          .from('payments')
+          .select('amount')
+          .eq('rental_id', rentalId);
+        
+        if (paymentsError) {
+            throw new Error("Could not fetch payment details.");
+        }
+
+        const totalPaid = paymentsData.reduce((sum, p) => sum + p.amount, 0);
+
+        // Step 4: Combine all the data into our state object.
         setDetails({
-          status: data.status,
-          box_code: boxCode,
-          pin_code: data.pin_code || 'Not Set',
-          start_date: formatDate(data.start_date),
-          end_date: formatDate(data.end_date),
-          items_type: data.items_type,
+          status: rentalData.status,
+          box_code: boxData.box_code,
+          pin_code: rentalData.pin_code || 'Not Set',
+          start_date: formatDate(rentalData.start_date),
+          end_date: formatDate(rentalData.end_date),
+          items_type: rentalData.items_type,
           total_paid: totalPaid,
         });
 
