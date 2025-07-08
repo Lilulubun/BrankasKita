@@ -1,14 +1,14 @@
 // src/middleware.ts
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({
     request: {
       headers: request.headers,
     },
-  })
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,66 +16,56 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         get(name: string) {
-          return request.cookies.get(name)?.value
+          return request.cookies.get(name)?.value;
         },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options })
+        set(name, value, options) {
+          response.cookies.set({ name, value, ...options });
         },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options })
+        remove(name, options) {
+          response.cookies.set({ name, value: '', ...options });
         },
       },
     }
-  )
+  );
 
-  const { data: { session } } = await supabase.auth.getSession()
-  const { pathname } = request.nextUrl
+  const { data: { session } } = await supabase.auth.getSession();
+  const { pathname } = request.nextUrl;
 
+  // Define all routes that are public and accessible to everyone.
   const publicRoutes = [
-    '/',
+    '/', // Allow access to the homepage
     '/login',
     '/register',
     '/forgot-password',
-    '/update-password'
+    '/update-password',
   ];
 
-  // A helper function to check if the current path is public
-  const isPublicPath = (path: string) => {
-    return publicRoutes.some(publicPath => 
-      path === publicPath || (publicPath !== '/' && path.startsWith(publicPath + '/'))
-    );
-  };
+  // Check if the current page is one of the public routes.
+  const isPublicRoute = publicRoutes.some(path => pathname === path);
 
   // If the user IS logged in...
   if (session) {
-    // ...and they are trying to access a public-only page (like login),
-    // redirect them to the homepage.
-    if (isPublicPath(pathname)) {
-      // Exception: allow access to homepage even when logged in
-      if (pathname === '/') {
-        return response;
-      }
-      return NextResponse.redirect(new URL('/', request.url))
+    // ...and they try to visit the login or register page, redirect them home.
+    if (pathname === '/login' || pathname === '/register') {
+      return NextResponse.redirect(new URL('/', request.url));
     }
   } 
   // If the user is NOT logged in...
   else {
     // ...and they are trying to access a page that is NOT public,
     // redirect them to the login page.
-    if (!isPublicPath(pathname)) {
-        return NextResponse.redirect(new URL('/login', request.url))
+    if (!isPublicRoute) {
+      return NextResponse.redirect(new URL('/login', request.url));
     }
   }
 
-  return response
+  // In all other cases (e.g., a logged-out user visiting a public page), let them through.
+  return response;
 }
 
-// --- THIS IS THE CORRECTED PART ---
-// This new matcher rule is more robust. It tells the middleware to run on all
-// paths EXCEPT for those that start with '/api', '/_next/static', '/_next/image',
-// or any path that contains a '.' (which signifies a file extension like .svg or .png).
+// This config ensures the middleware runs on all paths except for static assets.
 export const config = {
   matcher: [
     '/((?!api|_next/static|_next/image|.*\\..*).*)',
   ],
-}
+};
