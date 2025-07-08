@@ -130,7 +130,9 @@ const OrderCard = ({ order, onShowBarcode }: { order: Order, onShowBarcode: (bar
             </div>
 
             <div className="flex flex-col gap-2 w-full sm:w-auto">
-                <button className="w-full bg-gray-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700">
+                <button 
+                onClick={() => router.push('/see-details?rentalId=' + order.id)}
+                className="w-full bg-gray-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700">
                     See Details
                 </button>
                 <button 
