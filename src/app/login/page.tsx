@@ -138,12 +138,6 @@ export default function LoginPage(): React.ReactElement {
                   Remember me
                 </label>
               </div>
-
-              <div className="text-sm">
-                <a href="/forgot-password" className="font-medium text-grey-500 hover:text-gray-800">
-                  Forgot your password?
-                </a>
-              </div>
             </div>
 
             <div>

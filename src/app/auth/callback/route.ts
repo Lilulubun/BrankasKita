@@ -1,53 +1,39 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
-  const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get('code');
-  const access_token = requestUrl.searchParams.get('access_token');
-  const refresh_token = requestUrl.searchParams.get('refresh_token');
-  const next = requestUrl.searchParams.get('next') || '/';
+  const { searchParams } = new URL(request.url);
+  const code = searchParams.get('code');
+  const type = searchParams.get('type');
+  const next = searchParams.get('next') ?? '/';
 
-  const response = NextResponse.redirect(new URL(next, requestUrl.origin));
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    }
-  );
-
-  // 1️⃣ OAuth / magic link flow
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      console.error('❌ Error exchanging code:', error.message);
-      return NextResponse.redirect(new URL('/login?error=auth', requestUrl.origin));
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    try {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      
+      if (error) {
+        console.error('Error exchanging code for session:', error);
+        return NextResponse.redirect(new URL('/login?error=auth_error', request.url));
+      }
+
+      // Check if this is a password recovery flow
+      if (type === 'recovery') {
+        return NextResponse.redirect(new URL('/reset-password', request.url));
+      }
+
+      // For regular login/signup confirmations
+      return NextResponse.redirect(new URL(next, request.url));
+    } catch (error) {
+      console.error('Auth callback error:', error);
+      return NextResponse.redirect(new URL('/login?error=callback_error', request.url));
     }
-    return response;
   }
 
-  // 2️⃣ Password recovery flow
-  if (access_token && refresh_token) {
-    const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-    if (error) {
-      console.error('❌ Error setting session:', error.message);
-      return NextResponse.redirect(new URL('/login?error=session', requestUrl.origin));
-    }
-    return response;
-  }
-
-  // 3️⃣ Invalid link fallback
-  return NextResponse.redirect(new URL('/login?error=invalid-link', requestUrl.origin));
+  // No code provided, redirect to login
+  return NextResponse.redirect(new URL('/login', request.url));
 }
