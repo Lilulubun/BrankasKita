@@ -52,6 +52,9 @@ export default function Navbar(): React.ReactElement {
 
       <div className='right-side-nav'>
         <div className="nav-links">
+          <button onClick={() => setIsChatbotModalOpen(true)} className="nav-item">
+            <Image src={'/bot.svg'} width={24} height={24} alt={'chatbot'}/>
+          </button>
           {/* FIX: The href is now just "/" */}
           <Link href="/" className="nav-item active">
             Home
