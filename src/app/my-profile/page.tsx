@@ -84,31 +84,6 @@ export default function ProfilePage() {
     }, 1000);
   };
 
-  const handleDeleteAccount = async () => {
-    const confirm = window.confirm('Are you sure you want to delete your account? This action is permanent.');
-    if (!confirm) return;
-
-    // Hapus dari tabel users
-    const { error: deleteUserDataError } = await supabase
-      .from('users')
-      .delete()
-      .eq('id', userId);
-
-    if (deleteUserDataError) {
-      setError('Failed to delete user data.');
-      return;
-    }
-
-    // Hapus dari Auth (admin access required)
-    const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId);
-
-    if (deleteAuthError) {
-      setError('Failed to delete account.');
-    } else {
-      router.push('/register');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center items-center">
       <div className="bg-white shadow-md rounded-lg p-8 w-full max-w-md">
