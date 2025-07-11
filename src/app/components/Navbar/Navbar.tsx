@@ -1,6 +1,6 @@
+// src/app/components/Navbar/Navbar.tsx
 'use client';
 
-// src/app/components/Navbar/Navbar.tsx
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import './navbar.css';
@@ -9,24 +9,20 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 
-
 export default function Navbar(): React.ReactElement {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    // Check for existing session
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setUser(session.user);
       }
     };
-
     checkUser();
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
@@ -37,28 +33,12 @@ export default function Navbar(): React.ReactElement {
   }, []);
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      router.push('/');
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
+    await supabase.auth.signOut();
+    router.push('/'); // Redirect to homepage after logout
+    router.refresh(); // Refresh to update server components
   };
 
-  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
-    e.preventDefault();
-    const element = document.getElementById(sectionId);
-    if (element) {
-      const navbarHeight = document.querySelector('nav')?.offsetHeight || 0;
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - navbarHeight;
-      
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      });
-    }
-  };
+  // The handleNavClick function is no longer needed and has been removed.
 
   return (
     <nav className="navbar">
@@ -70,10 +50,13 @@ export default function Navbar(): React.ReactElement {
 
       <div className='right-side-nav'>
         <div className="nav-links">
-          <Link href="/" className="nav-item active" onClick={(e) => handleNavClick(e, 'hero')}>
+          {/* FIX: The href is now just "/" */}
+          <Link href="/" className="nav-item active">
             Home
           </Link>
-          <Link href="#booking" className="nav-item" onClick={(e) => handleNavClick(e, 'booking')}>
+          {/* FIX: The href now correctly points to the booking section on the homepage */}
+          {/* The onClick handler has been removed to allow the link to work from any page */}
+          <Link href="/#booking" className="nav-item">
             Booking
           </Link>
         </div>
@@ -82,7 +65,6 @@ export default function Navbar(): React.ReactElement {
           onMouseEnter={() => setDropdownOpen(true)}
           onMouseLeave={() => setDropdownOpen(false)}
         >
-          
           <div className="user-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="8" r="5" />

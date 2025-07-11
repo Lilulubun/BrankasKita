@@ -98,8 +98,8 @@ function ConfirmationClientComponent() {
     });
   };
 
-  const handleBackToHome = () => {
-    router.push('/');
+  const handleGoToMyOrders = () => {
+    router.push('/my-orders');
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="text-lg">Loading confirmation...</div></div>;
@@ -167,10 +167,10 @@ function ConfirmationClientComponent() {
           </div>
           
           <button
-            onClick={handleBackToHome}
+            onClick={handleGoToMyOrders}
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 mt-8"
           >
-            Back to Home
+            Go to My Orders
           </button>
         </div>
       </div>

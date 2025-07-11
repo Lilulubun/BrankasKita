@@ -5,7 +5,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from './components/Navbar/Navbar';
 import Footer from './components/Footer/Footer';
-import { AuthProvider } from "./components/AuthProvider/AuthProvider"; // <-- 1. IMPORT
+import { AuthProvider } from "./components/AuthProvider/AuthProvider";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: '--plus-jakarta-sans',
@@ -26,11 +26,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={plusJakartaSans.className} suppressHydrationWarning>
-          {/* 2. WRAP YOUR APP WITH THE PROVIDER */}
+      <body className={`${plusJakartaSans.className} flex flex-col min-h-screen`} suppressHydrationWarning>
           <AuthProvider>
             <Navbar />
-            {children}
+            <main className="flex-grow">
+              {children}
+            </main>
             <Footer />
           </AuthProvider>
       </body>
