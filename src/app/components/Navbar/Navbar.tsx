@@ -8,12 +8,13 @@ import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
+import ChatbotModal from '../ChatbotModal';
 
 export default function Navbar(): React.ReactElement {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
-
+  const [isChatbotModalOpen, setIsChatbotModalOpen] = useState(false);
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -41,6 +42,7 @@ export default function Navbar(): React.ReactElement {
   // The handleNavClick function is no longer needed and has been removed.
 
   return (
+    <>  
     <nav className="navbar">
       <div className="logo-container">
         <Link href="/" className="logo-icon">
@@ -96,5 +98,7 @@ export default function Navbar(): React.ReactElement {
         </div>
       </div>
     </nav>
+    <ChatbotModal open={isChatbotModalOpen} onClose={() => setIsChatbotModalOpen(false)} />
+    </>
   );
 }
