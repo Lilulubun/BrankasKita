@@ -1,3 +1,4 @@
+// src/app/components/ChatbotModal.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -12,15 +13,14 @@ interface ChatbotModalProps {
 export default function ChatbotModal({ open, onClose }: ChatbotModalProps) {
   const [message, setMessage] = useState('');
   const [displayName, setDisplayName] = useState('User');
-  const [file, setFile] = useState<File | null>(null);
-  const [botReply, setBotReply] = useState<string | null>(null);
+  // const [file, setFile] = useState<File | null>(null); // This was unused
   const [messages, setMessages] = useState([
     { role: 'model', content: 'Hello! I am BrankasBot, how can I help you? :D' }
   ]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const chatAreaRef = useRef<HTMLDivElement>(null); // ref for chat area
-  const textareaRef = useRef<HTMLTextAreaElement>(null); // ref for textarea input
+  const chatAreaRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -44,44 +44,40 @@ export default function ChatbotModal({ open, onClose }: ChatbotModalProps) {
   }, [open]);
 
   useEffect(() => {
-    // auto-scroll to bottom when messages or loading changes
     if (chatAreaRef.current) {
       chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
     }
-    // focus on the textarea when modal opens or messages change
     if (open && textareaRef.current) {
       textareaRef.current.focus();
     }
   }, [messages, isLoading, open]);
 
   const handleSend = async () => {
-    if (!message && !file || isLoading) return;
-    setBotReply(null);
+    if (!message || isLoading) return;
     setIsLoading(true);
-    if (message) {
-      const userMessage = { role: 'user', content: message };
-      // no need system prompt, just send user message
-      const updatedMessages = [...messages.slice(1), userMessage];
-      setMessages([...messages, userMessage]);
-      setMessage(''); // clear input after sending
-      // focus textarea after sending message
-      setTimeout(() => {
-        textareaRef.current?.focus();
-      }, 0);
-      try {
-        const res = await fetch('/api/gemini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: updatedMessages }),
-        });
-        const data = await res.json();
-        setBotReply(data.reply);
-        setMessages([...messages, userMessage, { role: 'model', content: data.reply }]);
-      } catch (err) {
-        setBotReply('Maaf, terjadi kesalahan.');
-      } finally {
-        setIsLoading(false);
-      }
+    
+    const userMessage = { role: 'user', content: message };
+    const updatedMessagesForApi = [...messages.slice(1), userMessage]; // Don't send the initial greeting to the API
+    setMessages([...messages, userMessage]);
+    setMessage('');
+    
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+    
+    try {
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: updatedMessagesForApi }),
+      });
+      const data = await res.json();
+      // FIX: Removed setBotReply as it was unused. Directly update the messages state.
+      setMessages(prev => [...prev, { role: 'model', content: data.reply }]);
+    } catch { // FIX: Removed unused 'err' variable
+      setMessages(prev => [...prev, { role: 'model', content: 'Maaf, terjadi kesalahan.' }]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -92,27 +88,19 @@ export default function ChatbotModal({ open, onClose }: ChatbotModalProps) {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFile(e.target.files[0]);
-    }
-  };
+  // FIX: Removed the unused handleFileChange function.
 
   if (!open) return null;
 
   return (
+    // ... your original JSX remains here ...
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 transition-colors duration-300 p-4 sm:p-6">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto p-6 relative" style={{ maxHeight: '90vh', overflow: 'auto' }}>
-        {/* close button */}
         <button className="absolute top-4 right-4 text-xl" onClick={onClose}>✕</button>
-
-        {/* header chatbot */}
         <div className="flex items-center space-x-2 font-semibold text-lg mb-4">
           <span>BrankasBot</span>
           <Image src="/bot.svg" width={24} height={24} alt="Bot Icon" />
         </div>
-
-        {/* greeting */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold flex justify-center items-center gap-2">
             Hi, {displayName}
@@ -120,8 +108,6 @@ export default function ChatbotModal({ open, onClose }: ChatbotModalProps) {
           </h2>
           <p className="text-gray-600 mt-1">How can I help you today?</p>
         </div>
-
-        {/* chat area */}
         <div
           ref={chatAreaRef}
           className="mb-4 max-h-64 sm:max-h-80 overflow-y-auto px-2"
@@ -160,11 +146,7 @@ export default function ChatbotModal({ open, onClose }: ChatbotModalProps) {
             </div>
           )}
         </div>
-
-        {/* box input */}
         <div className="bg-black rounded-2xl px-5 py-3 flex items-center justify-between w-full max-w-xl mx-auto shadow-2xl shadow-black/40 border border-black/60">
-
-        {/* textarea Input */}
         <textarea
             ref={textareaRef}
             placeholder="Ask anything..."
@@ -175,8 +157,6 @@ export default function ChatbotModal({ open, onClose }: ChatbotModalProps) {
             rows={1}
             disabled={isLoading}
         />
-
-        {/* send button */}
         <button onClick={handleSend} className="text-white text-2xl leading-none">↑</button>
         </div>
       </div>

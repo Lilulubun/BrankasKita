@@ -1,6 +1,14 @@
+// src/app/api/gemini/route.ts
+
 import fs from 'fs';
 import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
+
+// Define a type for the messages for better type safety
+interface ChatMessage {
+  role: 'user' | 'model' | 'system';
+  content: string;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,25 +21,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ reply: 'Format messages tidak valid.' }, { status: 400 });
     }
     
-    // read knowledge base from CSV
     const csvPath = path.join(process.cwd(), 'src', 'data', 'helpuser.csv');
     let knowledge = '';
     try {
       knowledge = fs.readFileSync(csvPath, 'utf8');
-    } catch (e) {
+    } catch { // FIX: Removed unused 'e' variable
       knowledge = '';
     }
 
-    // add knowledge base to the system prompt
     const systemPrompt = {
       role: 'system',
       content: `Berikut knowledge base BrankasKita:\n${knowledge}\nPelajari data tersebut dan gunakan untuk menjawab pertanyaan dari pengguna sesuai dengan konteks yang ditanyakan.
       Setiap kali pengguna mengajukan pertanyaan, pahami terlebih dahulu konteksnya, lalu berikan jawaban yang relevan berdasarkan data di atas. Gunakan bahasa inggris yang baik dan benar.`,
     };
 
-    // change the first user message to a system prompt
-    const userMessages = messages.filter((msg: any) => msg.role !== 'system');
-    const geminiMessages = [systemPrompt, ...userMessages].map((msg: { role: string, content: string }) => ({
+    // FIX: Provided a specific type for 'msg'
+    const userMessages = messages.filter((msg: ChatMessage) => msg.role !== 'system');
+    const geminiMessages = [systemPrompt, ...userMessages].map((msg: ChatMessage) => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }],
     }));
@@ -53,7 +59,8 @@ export async function POST(req: NextRequest) {
     const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Maaf, terjadi kesalahan.';
 
     return NextResponse.json({ reply });
-  } catch (error: any) {
-    return NextResponse.json({ reply: 'Internal error: ' + error?.message }, { status: 500 });
+  } catch (error: unknown) { // FIX: Changed 'any' to 'unknown' for better type safety
+    const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+    return NextResponse.json({ reply: 'Internal error: ' + message }, { status: 500 });
   }
 }
