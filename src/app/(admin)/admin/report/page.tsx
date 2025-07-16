@@ -81,7 +81,7 @@ export default function ReportPage() {
   // Fetches the initial list of available reports
   useEffect(() => {
     const fetchReportList = async () => {
-      const { data, error } = await supabase.rpc('get_available_reports');
+      const { data } = await supabase.rpc('get_available_reports');
       if (data && data.length > 0) {
         setAvailableReports(data);
         setSelectedReportId(data[0].id);
