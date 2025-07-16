@@ -156,11 +156,6 @@ export default function PaymentsPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.user_email}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${payment.amount.toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.method}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:underline">
-                    <Link href={`/admin/see-details?rentalId=${payment.rental_id}`}>
-                      View Rental
-                    </Link>
-                  </td>
                 </tr>
               ))}
             </tbody>
