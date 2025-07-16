@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Barcode from 'react-barcode';
-import BoxIcon from '@/app/components/BoxIcons/BoxIcon'; 
+import BoxIcon from '@/app/(main)/components/BoxIcons/BoxIcon'; 
 import { useRouter } from 'next/navigation';
 
 // --- Helper functions ---
