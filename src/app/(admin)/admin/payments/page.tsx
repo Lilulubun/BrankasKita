@@ -3,7 +3,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import Link from 'next/link';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // Define types for our data objects
