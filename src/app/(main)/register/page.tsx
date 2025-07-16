@@ -4,8 +4,6 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
-// The router is no longer needed in handleSubmit, but might be used elsewhere.
-import { useRouter } from 'next/navigation';
 
 export default function RegisterPage(): React.ReactElement {
   const [name, setName] = useState('');
@@ -15,7 +13,6 @@ export default function RegisterPage(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null); // Added for success messages
   const [loading, setLoading] = useState(false);
-  const router = useRouter(); // Keep if used by Google Login
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +29,7 @@ export default function RegisterPage(): React.ReactElement {
     try {
       // Step 1: Call Supabase Auth to sign the user up.
       // The 'full_name' is passed in the options data.
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {

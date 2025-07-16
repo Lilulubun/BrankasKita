@@ -119,9 +119,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
-// Add a GET handler for testing
-export async function GET(req: NextRequest) {
-  console.log('GET request to API route');
-  return NextResponse.json({ message: 'API route is working' });
-}
